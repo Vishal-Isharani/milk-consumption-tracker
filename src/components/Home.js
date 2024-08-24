@@ -13,6 +13,33 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [changingPrice, setChangingPrice] = useState(false);
+  const [quantityInputDisabled, setQuantityInputDisabled] = useState(false);
+
+  useEffect(() => {
+    const fetchDataForDate = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, "milkConsumption"));
+        querySnapshot.forEach((doc) => {
+          if (doc.data().date === date) {
+            setQuantity(doc.data().quantity);
+
+            // disable the quantity input if a record already exists for the date
+            // this is to prevent duplicate entries for the same date
+            // and to avoid confusion
+            // the user can still change the date to add a new record
+
+            setQuantityInputDisabled(true);
+          } else {
+            setQuantity("");
+            setQuantityInputDisabled(false);
+          }
+        });
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+    fetchDataForDate();
+  }, [date]);
 
   useEffect(() => {
     const fetchPrice = async () => {
@@ -90,6 +117,7 @@ export default function Home() {
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 required
+                disabled={submitting}
                 className="w-full p-2 border rounded"
               />
               <button
@@ -119,6 +147,7 @@ export default function Home() {
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
                   required
+                  disabled={quantityInputDisabled}
                   className="w-full p-2 border rounded"
                 />
                 <div className="flex items-center space-x-2">
@@ -135,7 +164,7 @@ export default function Home() {
                 <button
                   type="submit"
                   className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
-                  disabled={submitting}
+                  disabled={submitting || quantityInputDisabled}
                 >
                   {submitting ? (
                     <ClipLoader color={"#ffffff"} size={20} />
