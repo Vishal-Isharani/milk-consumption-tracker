@@ -52,6 +52,11 @@ export default function Report() {
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           data.price = price;
+          data.dateString = new Date(data.date).toDateString();
+          data.dateString = data.dateString.slice(
+            0,
+            data.dateString.length - 5,
+          );
           totalQty += data.quantity;
           recordsList.push(data);
         });
@@ -114,7 +119,7 @@ export default function Report() {
 
           <div
             className="flex cursor-pointer"
-            style={{ justifyContent: "flex-end" }}
+            style={{ justifyContent: "flex-end", marginTop: 0 }}
           >
             <Link to="/" className="block text-blue-500 sm:text-base">
               <PlusIcon style={{ width: 30, margin: "0 10px" }} />
@@ -128,13 +133,14 @@ export default function Report() {
               <ArrowDownTrayIcon style={{ width: 30, margin: "0 10px" }} />
             </button>
           </div>
+
           <table className="min-w-full bg-white border border-gray-200">
             <thead>
               <tr className="bg-gray-200">
-                <th className="px-4 py-2 text-left text-sm sm:text-xs">
-                  <div className="flex cursor-pointer">
+                <th className="py-2 text-sm sm:text-xs">
+                  <div className="flex justify-center cursor-pointer">
                     Date
-                    {sortOrder === "desc" ? (
+                    {sortOrder === "asc" ? (
                       <ArrowDownIcon
                         style={{ width: 20 }}
                         onClick={() => setSorting("date", "desc")}
@@ -148,10 +154,10 @@ export default function Report() {
                   </div>
                 </th>
 
-                <th className="px-4 py-2 text-left text-sm sm:text-xs">
-                  <div className="flex cursor-pointer">
+                <th className="py-2 text-sm sm:text-xs">
+                  <div className="flex justify-center cursor-pointer">
                     Quantity (liters)
-                    {sortOrder === "desc" ? (
+                    {sortOrder === "asc" ? (
                       <ArrowDownIcon
                         style={{ width: 20 }}
                         onClick={() => setSorting("quantity", "desc")}
@@ -164,7 +170,7 @@ export default function Report() {
                     )}
                   </div>
                 </th>
-                <th className="px-4 py-2 text-left text-sm sm:text-xs">
+                <th className="py-2 text-sm text-center sm:text-xs">
                   Price (₹)
                 </th>
               </tr>
@@ -172,11 +178,15 @@ export default function Report() {
             <tbody>
               {reportData.map((data, index) => (
                 <tr key={index} className="border-b">
-                  <td className="px-4 py-2 text-sm sm:text-xs">{data.date}</td>
-                  <td className="px-4 py-2 text-sm sm:text-xs">
+                  <td className="py-2 text-sm sm:text-xs text-center">
+                    {data.dateString}
+                  </td>
+                  <td className="py-2 text-sm sm:text-xs text-center">
                     {data.quantity}
                   </td>
-                  <td className="px-4 py-2 text-sm sm:text-xs">{data.price}</td>
+                  <td className="py-2 text-sm sm:text-xs text-center">
+                    {data.price}
+                  </td>
                 </tr>
               ))}
             </tbody>

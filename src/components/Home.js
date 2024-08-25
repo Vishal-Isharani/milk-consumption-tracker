@@ -83,7 +83,7 @@ export default function Home() {
 
       const newDate = new Date(date);
       newDate.setDate(newDate.getDate() + 1);
-      setDate(newDate);
+      setDate(newDate.toISOString().split("T")[0]);
       setQuantity("");
     } catch (error) {
       console.error("Error adding record:", error);
