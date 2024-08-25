@@ -1,10 +1,14 @@
 // src/components/Report.js
 import React, { useState, useEffect } from "react";
 import { db } from "../firebaseConfig";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { ClipLoader } from "react-spinners";
+import { PlusIcon } from "@heroicons/react/24/solid";
+import { ArrowDownTrayIcon } from "@heroicons/react/24/solid";
+import { ArrowDownIcon } from "@heroicons/react/24/solid";
+import { ArrowUpIcon } from "@heroicons/react/24/solid";
 
 export default function Report() {
   const [price, setPrice] = useState(null);
@@ -15,6 +19,8 @@ export default function Report() {
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().slice(0, 7),
   );
+  const [sortBy, setSortBy] = useState("quantity");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   useEffect(() => {
     const fetchPrice = async () => {
@@ -38,6 +44,7 @@ export default function Report() {
           collection(db, "milkConsumption"),
           where("date", ">=", `${selectedMonth}-01`),
           where("date", "<=", `${selectedMonth}-31`),
+          orderBy(sortBy, sortOrder),
         );
         const querySnapshot = await getDocs(q);
         let totalQty = 0;
@@ -58,13 +65,18 @@ export default function Report() {
       }
     };
     fetchRecords();
-  }, [selectedMonth, price]);
+  }, [selectedMonth, price, sortBy, sortOrder]);
 
   const downloadReport = () => {
     const ws = XLSX.utils.json_to_sheet(reportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Report");
     XLSX.writeFile(wb, `milk_report_${selectedMonth}.xlsx`);
+  };
+
+  const setSorting = (field, order) => {
+    setSortBy(field);
+    setSortOrder(order);
   };
 
   return (
@@ -91,12 +103,66 @@ export default function Report() {
         </div>
       ) : reportData.length > 0 ? (
         <div className="space-y-4">
+          <div className="mt-4 flex-col">
+            <p className="text-xl font-semibold sm:text-lg">
+              Total Quantity: {totalQuantity} liters
+            </p>
+            <p className="text-xl font-semibold sm:text-lg">
+              Total Cost: ₹{totalCost}
+            </p>
+          </div>
+
+          <div
+            className="flex cursor-pointer"
+            style={{ justifyContent: "flex-end" }}
+          >
+            <Link to="/" className="block text-blue-500 sm:text-base">
+              <PlusIcon style={{ width: 30, margin: "0 10px" }} />
+            </Link>
+
+            <button
+              onClick={downloadReport}
+              className="text-blue-500 sm:text-base"
+              disabled={loading || !reportData.length}
+            >
+              <ArrowDownTrayIcon style={{ width: 30, margin: "0 10px" }} />
+            </button>
+          </div>
           <table className="min-w-full bg-white border border-gray-200">
             <thead>
               <tr className="bg-gray-200">
-                <th className="px-4 py-2 text-left text-sm sm:text-xs">Date</th>
                 <th className="px-4 py-2 text-left text-sm sm:text-xs">
-                  Quantity (liters)
+                  <div className="flex cursor-pointer">
+                    Date
+                    {sortOrder === "desc" ? (
+                      <ArrowDownIcon
+                        style={{ width: 20 }}
+                        onClick={() => setSorting("date", "desc")}
+                      />
+                    ) : (
+                      <ArrowUpIcon
+                        style={{ width: 20 }}
+                        onClick={() => setSorting("date", "asc")}
+                      />
+                    )}
+                  </div>
+                </th>
+
+                <th className="px-4 py-2 text-left text-sm sm:text-xs">
+                  <div className="flex cursor-pointer">
+                    Quantity (liters)
+                    {sortOrder === "desc" ? (
+                      <ArrowDownIcon
+                        style={{ width: 20 }}
+                        onClick={() => setSorting("quantity", "desc")}
+                      />
+                    ) : (
+                      <ArrowUpIcon
+                        style={{ width: 20 }}
+                        onClick={() => setSorting("quantity", "asc")}
+                      />
+                    )}
+                  </div>
                 </th>
                 <th className="px-4 py-2 text-left text-sm sm:text-xs">
                   Price (₹)
@@ -115,35 +181,12 @@ export default function Report() {
               ))}
             </tbody>
           </table>
-
-          <div className="mt-4">
-            <p className="text-xl font-semibold sm:text-lg">
-              Total Quantity: {totalQuantity} liters
-            </p>
-            <p className="text-xl font-semibold sm:text-lg">
-              Total Cost: ₹{totalCost}
-            </p>
-          </div>
-
-          <button
-            onClick={downloadReport}
-            className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 sm:text-base"
-          >
-            Download Report as Excel
-          </button>
         </div>
       ) : (
         <p className="text-center text-gray-500 sm:text-base">
           No data available for this month.
         </p>
       )}
-
-      <Link
-        to="/"
-        className="block text-center mt-6 text-blue-500 hover:underline sm:text-base"
-      >
-        Back to Add Milk Consumption
-      </Link>
     </div>
   );
 }

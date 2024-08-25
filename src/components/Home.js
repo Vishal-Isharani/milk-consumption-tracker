@@ -1,7 +1,14 @@
 // src/components/Home.js
 import React, { useState, useEffect } from "react";
 import { db } from "../firebaseConfig";
-import { collection, addDoc, getDocs, deleteDoc } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  getDocs,
+  deleteDoc,
+  query,
+  where,
+} from "firebase/firestore";
 import { Link } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 
@@ -17,29 +24,36 @@ export default function Home() {
 
   useEffect(() => {
     const fetchDataForDate = async () => {
+      if (!hasPrice) return;
+      setLoading(true);
       try {
-        const querySnapshot = await getDocs(collection(db, "milkConsumption"));
-        querySnapshot.forEach((doc) => {
+        const q = query(
+          collection(db, "milkConsumption"),
+          where("date", "==", date),
+        );
+        const querySnapshot = await getDocs(q);
+        if (querySnapshot.docs.length) {
+          const doc = querySnapshot.docs[0];
           if (doc.data().date === date) {
             setQuantity(doc.data().quantity);
-
-            // disable the quantity input if a record already exists for the date
-            // this is to prevent duplicate entries for the same date
-            // and to avoid confusion
-            // the user can still change the date to add a new record
-
             setQuantityInputDisabled(true);
           } else {
             setQuantity("");
             setQuantityInputDisabled(false);
           }
-        });
+        } else {
+          setQuantity("");
+          setQuantityInputDisabled(false);
+        }
+
+        setLoading(false);
       } catch (error) {
+        setLoading(false);
         console.error("Error fetching data:", error);
       }
     };
     fetchDataForDate();
-  }, [date]);
+  }, [date, hasPrice]);
 
   useEffect(() => {
     const fetchPrice = async () => {
@@ -66,6 +80,10 @@ export default function Home() {
         date,
         quantity: parseFloat(quantity),
       });
+
+      const newDate = new Date(date);
+      newDate.setDate(newDate.getDate() + 1);
+      setDate(newDate);
       setQuantity("");
     } catch (error) {
       console.error("Error adding record:", error);
@@ -169,7 +187,7 @@ export default function Home() {
                   {submitting ? (
                     <ClipLoader color={"#ffffff"} size={20} />
                   ) : (
-                    "Add Record"
+                    "Submit and Next"
                   )}
                 </button>
               </form>
