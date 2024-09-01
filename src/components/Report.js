@@ -1,7 +1,15 @@
 // src/components/Report.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { db } from "../firebaseConfig";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { ClipLoader } from "react-spinners";
@@ -17,10 +25,47 @@ export default function Report() {
   const [totalQuantity, setTotalQuantity] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(
-    new Date().toISOString().slice(0, 7),
+    new Date().toISOString().slice(0, 7)
   );
-  const [sortBy, setSortBy] = useState("quantity");
+
+  const [editingId, setEditingId] = useState(null);
+  const [editQuantity, setEditQuantity] = useState("");
+  const [sortBy, setSortBy] = useState("date");
   const [sortOrder, setSortOrder] = useState("desc");
+
+  const _fetchRecords = useCallback(async () => {
+    setLoading(true);
+    try {
+      const q = query(
+        collection(db, "milkConsumption"),
+        where("date", ">=", `${selectedMonth}-01`),
+        where("date", "<=", `${selectedMonth}-31`),
+        orderBy(sortBy, sortOrder)
+      );
+      const querySnapshot = await getDocs(q);
+      let totalQty = 0;
+      const recordsList = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        data.id = doc.id;
+        data.price = price;
+        data.dateString = new Date(data.date).toDateString();
+        data.dateString = data.dateString.slice(
+          0,
+          data.dateString.length - 5
+        );
+        totalQty += data.quantity;
+        recordsList.push(data);
+      });
+      setReportData(recordsList);
+      setTotalQuantity(totalQty);
+      setTotalCost(totalQty * price);
+    } catch (error) {
+      console.error("Error fetching records:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedMonth, price, sortBy, sortOrder]);
 
   useEffect(() => {
     const fetchPrice = async () => {
@@ -37,40 +82,32 @@ export default function Report() {
   }, []);
 
   useEffect(() => {
-    const fetchRecords = async () => {
-      setLoading(true);
-      try {
-        const q = query(
-          collection(db, "milkConsumption"),
-          where("date", ">=", `${selectedMonth}-01`),
-          where("date", "<=", `${selectedMonth}-31`),
-          orderBy(sortBy, sortOrder),
-        );
-        const querySnapshot = await getDocs(q);
-        let totalQty = 0;
-        const recordsList = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          data.price = price;
-          data.dateString = new Date(data.date).toDateString();
-          data.dateString = data.dateString.slice(
-            0,
-            data.dateString.length - 5,
-          );
-          totalQty += data.quantity;
-          recordsList.push(data);
-        });
-        setReportData(recordsList);
-        setTotalQuantity(totalQty);
-        setTotalCost(totalQty * price);
-      } catch (error) {
-        console.error("Error fetching records:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRecords();
-  }, [selectedMonth, price, sortBy, sortOrder]);
+    _fetchRecords();
+  }, [_fetchRecords]);
+
+  const handleEdit = (id, quantity) => {
+    setEditingId(id);
+    setEditQuantity(quantity.toString());
+  };
+
+  const handleSave = async (id) => {
+    setLoading(true);
+    try {
+      const docRef = doc(db, "milkConsumption", id);
+      await updateDoc(docRef, { quantity: Number(editQuantity) });
+      setEditingId(null);
+      _fetchRecords();
+    } catch (error) {
+      console.error("Error updating document: ", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditingId(null);
+    setEditQuantity("");
+  };
 
   const downloadReport = () => {
     const ws = XLSX.utils.json_to_sheet(reportData);
@@ -173,19 +210,51 @@ export default function Report() {
                 <th className="py-2 text-sm text-center sm:text-xs">
                   Price (₹)
                 </th>
+                <th className="py-2 text-sm text-center sm:text-xs">Actions</th>
               </tr>
             </thead>
             <tbody>
               {reportData.map((data, index) => (
-                <tr key={index} className="border-b">
+                <tr key={data.id} className="border-b">
                   <td className="py-2 text-sm sm:text-xs text-center">
                     {data.dateString}
                   </td>
                   <td className="py-2 text-sm sm:text-xs text-center">
-                    {data.quantity}
+                    {editingId === data.id ? (
+                      <input
+                        type="number"
+                        value={editQuantity}
+                        onChange={(e) => setEditQuantity(e.target.value)}
+                        className="w-20 p-1 border rounded"
+                      />
+                    ) : (
+                      data.quantity
+                    )}
                   </td>
                   <td className="py-2 text-sm sm:text-xs text-center">
                     {data.price}
+                  </td>
+                  <td className="py-2 text-sm sm:text-xs text-center">
+                    {editingId === data.id ? (
+                      <>
+                        <button
+                          onClick={() => handleSave(data.id)}
+                          className="text-green-500 mr-2"
+                        >
+                          Save
+                        </button>
+                        <button onClick={handleCancel} className="text-red-500">
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => handleEdit(data.id, data.quantity)}
+                        className="text-blue-500"
+                      >
+                        Edit
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
