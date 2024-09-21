@@ -1,6 +1,8 @@
 // src/components/Home.js
 import React, { useState, useEffect } from "react";
-import { db } from "../firebaseConfig";
+import { db, auth } from "../firebaseConfig";
+import { signOut } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 import {
   collection,
   addDoc,
@@ -21,62 +23,82 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [changingPrice, setChangingPrice] = useState(false);
   const [quantityInputDisabled, setQuantityInputDisabled] = useState(false);
+  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchDataForDate = async () => {
-      if (!hasPrice) return;
-      setLoading(true);
-      try {
-        const q = query(
-          collection(db, "milkConsumption"),
-          where("date", "==", date),
-        );
-        const querySnapshot = await getDocs(q);
-        if (querySnapshot.docs.length) {
-          const doc = querySnapshot.docs[0];
-          if (doc.data().date === date) {
-            setQuantity(doc.data().quantity);
-            setQuantityInputDisabled(true);
-          } else {
-            setQuantity("");
-            setQuantityInputDisabled(false);
-          }
+    const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        fetchPrice(currentUser.uid);
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (user && hasPrice) {
+      fetchDataForDate(user.uid);
+    }
+  }, [date, hasPrice, user]);
+
+  const fetchDataForDate = async (uid) => {
+    if (!hasPrice || !uid) return;
+    setLoading(true);
+    try {
+      const q = query(
+        collection(db, `users/${uid}/milkConsumption`),
+        where("date", "==", date),
+      );
+      const querySnapshot = await getDocs(q);
+      if (querySnapshot.docs.length) {
+        const doc = querySnapshot.docs[0];
+        if (doc.data().date === date) {
+          setQuantity(doc.data().quantity);
+          setQuantityInputDisabled(true);
         } else {
           setQuantity("");
           setQuantityInputDisabled(false);
         }
-
-        setLoading(false);
-      } catch (error) {
-        setLoading(false);
-        console.error("Error fetching data:", error);
+      } else {
+        setQuantity("");
+        setQuantityInputDisabled(false);
       }
-    };
-    fetchDataForDate();
-  }, [date, hasPrice]);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  useEffect(() => {
-    const fetchPrice = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "price"));
-        querySnapshot.forEach((doc) => {
-          setPrice(doc.data().price);
-          setHasPrice(true);
-        });
-      } catch (error) {
-        console.error("Error fetching price:", error);
-      } finally {
-        setLoading(false);
+  const fetchPrice = async (uid) => {
+    setLoading(true);
+    try {
+      const querySnapshot = await getDocs(collection(db, `price`));
+      if (!querySnapshot.empty) {
+        const doc = querySnapshot.docs[0];
+        setPrice(doc.data().price);
+        setHasPrice(true);
+      } else {
+        setHasPrice(false);
       }
-    };
-    fetchPrice();
-  }, []);
+    } catch (error) {
+      console.error("Error fetching price:", error);
+      setHasPrice(false);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!user) return;
     setSubmitting(true);
     try {
-      await addDoc(collection(db, "milkConsumption"), {
+      await addDoc(collection(db, `users/${user.uid}/milkConsumption`), {
         date,
         quantity: parseFloat(quantity),
       });
@@ -94,17 +116,16 @@ export default function Home() {
 
   const handlePriceSubmit = async (e) => {
     e.preventDefault();
+    if (!user) return;
     setSubmitting(true);
     try {
       if (hasPrice) {
-        // Delete the old price entry
-        const querySnapshot = await getDocs(collection(db, "price"));
+        const querySnapshot = await getDocs(collection(db, `users/${user.uid}/price`));
         querySnapshot.forEach(async (doc) => {
           await deleteDoc(doc.ref);
         });
       }
-      // Add the new price
-      await addDoc(collection(db, "price"), { price: parseFloat(price) });
+      await addDoc(collection(db, `users/${user.uid}/price`), { price: parseFloat(price) });
       setHasPrice(true);
       setChangingPrice(false);
       alert("Price updated successfully.");
@@ -112,6 +133,15 @@ export default function Home() {
       console.error("Error setting price:", error);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      navigate("/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
     }
   };
 
@@ -206,6 +236,15 @@ export default function Home() {
           >
             View Monthly Report
           </Link>
+          <button
+            onClick={handleSignOut}
+            className="w-full mt-6 bg-red-500 text-white p-2 rounded hover:bg-red-600 transition duration-300 ease-in-out flex items-center justify-center"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
+            </svg>
+            Sign Out
+          </button>
         </>
       )}
     </div>
