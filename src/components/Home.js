@@ -50,7 +50,7 @@ export default function Home() {
     setLoading(true);
     try {
       const q = query(
-        collection(db, `users/${uid}/milkConsumption`),
+        collection(db, 'milkConsumption'),
         where("date", "==", date),
       );
       const querySnapshot = await getDocs(q);
@@ -98,7 +98,7 @@ export default function Home() {
     if (!user) return;
     setSubmitting(true);
     try {
-      await addDoc(collection(db, `users/${user.uid}/milkConsumption`), {
+      await addDoc(collection(db, 'milkConsumption'), {
         date,
         quantity: parseFloat(quantity),
       });
@@ -120,12 +120,12 @@ export default function Home() {
     setSubmitting(true);
     try {
       if (hasPrice) {
-        const querySnapshot = await getDocs(collection(db, `users/${user.uid}/price`));
+        const querySnapshot = await getDocs(collection(db, `price`));
         querySnapshot.forEach(async (doc) => {
           await deleteDoc(doc.ref);
         });
       }
-      await addDoc(collection(db, `users/${user.uid}/price`), { price: parseFloat(price) });
+      await addDoc(collection(db, `price`), { price: parseFloat(price) });
       setHasPrice(true);
       setChangingPrice(false);
       alert("Price updated successfully.");
